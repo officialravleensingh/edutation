@@ -1,27 +1,38 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { NavBar } from "./NavBar";
+
+const getTimeForMode = (mode, settings) => {
+  switch (mode) {
+    case "pomodoro":
+      return settings.pomodoro * 60;
+    case "shortBreak":
+      return settings.shortBreak * 60;
+    default:
+      return settings.pomodoro * 60;
+  }
+};
 
 const PomodoroTimer = () => {
   const [activeMode, setActiveMode] = useState("pomodoro");
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
-  const [completedPomodoros, setCompletedPomodoros] = useState(0);
-  const [timerSettings, setTimerSettings] = useState({pomodoro: 25,shortBreak: 5});
+  const [timerSettings, setTimerSettings] = useState({pomodoro: 25, shortBreak: 5});
+  const [isTimerLoading, setIsTimerLoading] = useState(false);
+  
+  // Constants
+  const CIRCLE_RADIUS = 46;
+  const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
+  
+  // Refs for cleanup
+  const resetTimeoutRef = useRef(null);
+  const updateTimeoutRef = useRef(null);
+
   useEffect(() => {
-    let time;
-    switch (activeMode) {
-      case "pomodoro":
-        time = timerSettings.pomodoro * 60;
-        break;
-      case "shortBreak":
-        time = timerSettings.shortBreak * 60;
-        break;
-      default:
-        time = timerSettings.pomodoro * 60;
-    }
+    const time = getTimeForMode(activeMode, timerSettings);
     setTimeLeft(time);
     setIsRunning(false);
   }, [activeMode, timerSettings]);
+
   useEffect(() => {
     let interval = null;
     if (isRunning && timeLeft > 0) {
@@ -30,7 +41,6 @@ const PomodoroTimer = () => {
       }, 1000);
     } else if (isRunning && timeLeft === 0) {
       if (activeMode === "pomodoro") {
-        setCompletedPomodoros((prev) => prev + 1);
         setActiveMode("shortBreak");
         setIsRunning(false);
       } else {
@@ -39,50 +49,72 @@ const PomodoroTimer = () => {
       }
     }
     return () => clearInterval(interval);
-  }, [isRunning, timeLeft, activeMode, completedPomodoros]);
+  }, [isRunning, timeLeft, activeMode]);
 
-  const formatTime = (seconds) => {
+  const formatTime = useCallback((seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
+  }, []);
 
-  const calculateProgress = () => {
-    let totalTime;
-    switch (activeMode) {
-      case "pomodoro":
-        totalTime = timerSettings.pomodoro * 60;
-        break;
-      case "shortBreak":
-        totalTime = timerSettings.shortBreak * 60;
-        break;
-      default:
-        totalTime = timerSettings.pomodoro * 60;
-    }
+  const progress = useMemo(() => {
+    const totalTime = getTimeForMode(activeMode, timerSettings);
     return ((totalTime - timeLeft) / totalTime) * 100;
-  };
+  }, [activeMode, timerSettings, timeLeft]);
 
-  const resetTimer = () => {
-    let time;
-    switch (activeMode) {
-      case "pomodoro":
-        time = timerSettings.pomodoro * 60;
-        break;
-      case "shortBreak":
-        time = timerSettings.shortBreak * 60;
-        break;
-      default:
-        time = timerSettings.pomodoro * 60;
-    }
+  const resetTimer = useCallback(() => {
+    setIsTimerLoading(true);
+    const time = getTimeForMode(activeMode, timerSettings);
     setTimeLeft(time);
     setIsRunning(false);
-  };
+    
+    if (resetTimeoutRef.current) {
+      clearTimeout(resetTimeoutRef.current);
+    }
+    resetTimeoutRef.current = setTimeout(() => {
+      setIsTimerLoading(false);
+      resetTimeoutRef.current = null;
+    }, 200);
+  }, [activeMode, timerSettings]);
 
-  const updateTimerSettings = (newSettings) => {
+  const updateTimerSettings = useCallback((newSettings) => {
+    setIsTimerLoading(true);
     setTimerSettings(newSettings);
-  };
+    
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    updateTimeoutRef.current = setTimeout(() => {
+      setIsTimerLoading(false);
+      updateTimeoutRef.current = null;
+    }, 150);
+  }, []);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current);
+      }
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const getButtonText = useCallback(() => {
+    if (isRunning) return "Pause";
+    const totalTime = getTimeForMode(activeMode, timerSettings);
+    return timeLeft !== totalTime ? "Resume" : "Start";
+  }, [isRunning, timeLeft, activeMode, timerSettings]);
   return (
     <div className="flex flex-col items-center">
+      {isTimerLoading && (
+        <div className="fixed top-4 right-4 bg-blue-500 text-white px-3 py-1 rounded-full text-sm z-50">
+          Updating timer...
+        </div>
+      )}
+      
       <div className="bg-gray-100 dark:bg-gray-800 rounded-full p-1 flex mb-8 shadow-md">
         <button
           onClick={() => setActiveMode("pomodoro")}
@@ -102,11 +134,18 @@ const PomodoroTimer = () => {
         <svg className="absolute w-full h-full -rotate-90" viewBox="0 0 100 100">
           <circle className="text-gray-200 dark:text-gray-700 stroke-current" strokeWidth="4" cx="50" cy="50" r="46" fill="transparent" />
           <circle
-            className={`stroke-current ${activeMode === "pomodoro"
-              ? "text-blue-500"
-              : "text-green-500"}`}
-            strokeWidth="4" strokeLinecap="round" cx="50" cy="50" r="46" fill="transparent" strokeDasharray="289.02"
-            strokeDashoffset={289.02 - (289.02 * calculateProgress()) / 100} />
+            className={`stroke-current transition-all duration-300 ${
+              activeMode === "pomodoro" ? "text-blue-500" : "text-green-500"
+            }`}
+            strokeWidth="4"
+            strokeLinecap="round"
+            cx="50"
+            cy="50"
+            r={CIRCLE_RADIUS}
+            fill="transparent"
+            strokeDasharray={CIRCLE_CIRCUMFERENCE}
+            strokeDashoffset={CIRCLE_CIRCUMFERENCE - (CIRCLE_CIRCUMFERENCE * progress) / 100}
+          />
         </svg>
 
         <div className="text-center z-10">
@@ -120,10 +159,17 @@ const PomodoroTimer = () => {
         <button onClick={() => setIsRunning(!isRunning)}
           className={`px-6 py-3 rounded-full font-medium shadow-md transition-all ${isRunning
             ? "bg-red-500 hover:bg-red-600 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`} >
-          {isRunning ? "Pause" : timeLeft !== (activeMode === "pomodoro" ? timerSettings.pomodoro * 60 : timerSettings.shortBreak * 60)
-              ? "Resume": "Start"} </button>
+          {getButtonText()}
+        </button>
         <button onClick={resetTimer}
-          className="px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 flex items-center justify-center shadow-md transition-colors text-sm font-medium" >Reset</button>
+          disabled={isTimerLoading}
+          className="px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 flex items-center justify-center shadow-md transition-colors text-sm font-medium disabled:opacity-50" >
+          {isTimerLoading ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+          ) : (
+            "Reset"
+          )}
+        </button>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-80 max-w-md shadow-lg border border-gray-200 dark:border-gray-700 mb-8">
@@ -172,10 +218,15 @@ const PomodoroTimer = () => {
   );
 };
 
-const Index = ({ toggleTheme, isDarkMode }) => {
+const Index = ({ toggleTheme, isDarkMode, isThemeLoading }) => {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
-      <NavBar toggleTheme={toggleTheme} isDarkMode={isDarkMode} />
+      {isThemeLoading && (
+        <div className="fixed top-4 left-4 bg-blue-500 text-white px-3 py-1 rounded-full text-sm z-50 animate-pulse">
+          Switching theme...
+        </div>
+      )}
+      <NavBar toggleTheme={toggleTheme} isDarkMode={isDarkMode} isThemeLoading={isThemeLoading} />
 
       <main className="flex-1 py-12 container max-w-4xl mx-auto px-4">
         <div className="mb-10 text-center">
