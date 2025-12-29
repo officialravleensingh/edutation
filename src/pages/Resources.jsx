@@ -219,45 +219,76 @@ const Resources = ({ toggleTheme, isDarkMode, isThemeLoading }) => {
                 {books.map((book) => (
                   <Card key={book.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                     <CardContent className="p-0">
-                      <div className="flex items-center p-4 gap-4">
-                        <div className="flex-shrink-0">
-                          <Book className="h-8 w-8 text-blue-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium line-clamp-2 mb-1">{book.title}</h3>
-                          <p className="text-sm text-muted-foreground mb-1">by {book.author}</p>
-                          <div className="flex items-center text-xs text-muted-foreground mb-2">
-                            <span>Published: {book.publishYear}</span>
-                            {book.publisher && (
-                              <>
-                                <span className="mx-2">•</span>
-                                <span>{book.publisher}</span>
-                              </>
+                      {/* Mobile Layout */}
+                      <div className="block sm:hidden p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0">
+                            <Book className="h-6 w-6 text-blue-500 mt-1" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-sm line-clamp-2 mb-1">{book.title}</h3>
+                            <p className="text-xs text-muted-foreground mb-1">by {book.author}</p>
+                            <p className="text-xs text-muted-foreground">{book.publishYear}</p>
+                          </div>
+                          <div className="flex-shrink-0">
+                            {book.pdfUrl ? (
+                              <a href={book.pdfUrl} target="_blank" rel="noopener noreferrer">
+                                <Button size="sm" className="text-xs px-2 py-1 h-7">
+                                  <ExternalLink size={12} className="mr-1" />
+                                  Read
+                                </Button>
+                              </a>
+                            ) : (
+                              <Button size="sm" variant="outline" disabled className="text-xs px-2 py-1 h-7">
+                                N/A
+                              </Button>
                             )}
                           </div>
-                          {book.subjects.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {book.subjects.slice(0, 3).map((subject, index) => (
-                                <span key={index} className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
-                                  {subject}
-                                </span>
-                              ))}
-                            </div>
-                          )}
                         </div>
-                        <div className="flex-shrink-0">
-                          {book.pdfUrl ? (
-                            <a href={book.pdfUrl} target="_blank" rel="noopener noreferrer">
-                              <Button size="sm" className="flex items-center gap-2">
-                                <ExternalLink size={14} />
-                                {book.pdfUrl.includes('archive.org') ? 'Read Online' : 'View Details'}
+                      </div>
+
+                      {/* Desktop Layout */}
+                      <div className="hidden sm:block">
+                        <div className="flex items-center p-4 gap-4">
+                          <div className="flex-shrink-0">
+                            <Book className="h-8 w-8 text-blue-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium line-clamp-2 mb-1">{book.title}</h3>
+                            <p className="text-sm text-muted-foreground mb-1">by {book.author}</p>
+                            <div className="flex items-center text-xs text-muted-foreground mb-2">
+                              <span>Published: {book.publishYear}</span>
+                              {book.publisher && (
+                                <>
+                                  <span className="mx-2">•</span>
+                                  <span>{book.publisher}</span>
+                                </>
+                              )}
+                            </div>
+                            {book.subjects.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {book.subjects.slice(0, 3).map((subject, index) => (
+                                  <span key={index} className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                                    {subject}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-shrink-0">
+                            {book.pdfUrl ? (
+                              <a href={book.pdfUrl} target="_blank" rel="noopener noreferrer">
+                                <Button size="sm" className="flex items-center gap-2">
+                                  <ExternalLink size={14} />
+                                  {book.pdfUrl.includes('archive.org') ? 'Read Online' : 'View Details'}
+                                </Button>
+                              </a>
+                            ) : (
+                              <Button size="sm" variant="outline" disabled>
+                                No PDF Available
                               </Button>
-                            </a>
-                          ) : (
-                            <Button size="sm" variant="outline" disabled>
-                              No PDF Available
-                            </Button>
-                          )}
+                            )}
+                          </div>
                         </div>
                       </div>
                     </CardContent>
